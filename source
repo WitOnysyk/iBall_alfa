@@ -1,0 +1,314 @@
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+public class kulkaMovement : MonoBehaviour {
+
+	float r = 0, g = 0, b = 0, a = 0;  //zmienne do zmiany koloru kulki po respownie
+	float czas= 0; // czas po ktrym odmraza sie kulka po repownie
+	bool zamrozić = false; // zamraza kulke po 
+
+	//canvasy menu
+	private GameObject tapTap;
+	private GameObject gratulacje;
+	private GameObject settings;
+	private GameObject menuGl;
+	private Vector3 poczatek;
+	public AudioClip smiech;
+	public AudioClip brava;
+	public AudioClip pykpyk;
+	private AudioSource sound;
+
+	private bool Prawda1;
+	private bool finisz; // bool do sprawdzania czy mozna wywołać TapTap
+
+	//zmienne zwiazane z fizyka kulki
+	private Rigidbody kulka;
+	private float driveForce = 3f;	
+
+	//zmienne do obliczania czasu levelu
+	private float startTime;
+	private bool czasStop = false;
+	public Text czasomierz;
+	private float t;
+
+	private int numerSc;
+	public static kulkaMovement instancja;
+
+	public void Awake () {
+		gratulacje = GameObject.FindWithTag ("gratulacje");
+		tapTap = GameObject.FindWithTag ("taptap");
+		settings = GameObject.FindWithTag ("settings");
+		menuGl = GameObject.FindWithTag ("menuGl");
+		sound = GetComponent<AudioSource> ();
+		kulka = GetComponent<Rigidbody> ();
+
+
+		//singelton
+		if (!instancja)
+		{
+			DontDestroyOnLoad (this.gameObject);
+			instancja = this;
+		}
+		else
+		{
+			Destroy(gameObject);
+		}
+
+	}
+
+		void Start()
+		{
+		numerSc = SceneManager.GetActiveScene().buildIndex;
+		    sound.enabled = true;
+
+			tapTap.SetActive(false);
+			gratulacje.SetActive(false);
+			settings.SetActive(false);
+		    menuGl.SetActive(true);
+			Prawda1 = false;
+		    poczatek = gameObject.transform.position;
+		}
+
+	public void Update()
+	{ 
+		if(!czasStop)
+		t += Time.deltaTime;
+		
+		if (czasStop)
+		{
+			string minutes = ((int)t / 60).ToString ();
+			string seconds = (t % 60).ToString ("f2");
+			czasomierz.text = minutes + ":" + seconds;
+		}
+
+
+
+		Respown ();  
+		if(Prawda1)  // tapnieci działa tylko jezel jest wyłaczone menu
+		Tapnij ();
+		
+	}
+
+
+	public void FixedUpdate ()
+	{
+		if (Prawda1)   //ruch kulki jest liczony tylko jezeli jest wyłaczone menu
+			ruchKulki ();
+	}
+
+	public void ZaladujLevel()
+	{
+		
+		SceneManager.LoadScene (numerSc + 1, LoadSceneMode.Single);
+		startGry ();
+	}
+
+
+	public void Ustawienia()
+	{
+		menuGl.SetActive(false);
+		settings.SetActive(true);
+
+	}
+
+
+
+
+	public void SoundOn()
+	{
+		sound.enabled = true;
+	}
+	public void SoundOff()
+	{
+		sound.enabled = false;
+	}
+
+	public void BacktoMenu()
+	{
+		menuGl.SetActive(true);
+		settings.SetActive(false);
+	}
+
+
+
+	//metoda wywolywana po klinieciu Resume w menu TapTap
+	public void Resume()
+	{
+		
+		tapTap.SetActive(false);
+		gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.None;
+		Prawda1 = true;
+
+
+	}
+
+	//metoda wywoływana po kliknieciu Exit w menu TapTap
+	public void GoToMenu()
+	{
+		menuGl.SetActive(true);
+		tapTap.SetActive (false);
+		gameObject.transform.position = poczatek;
+		gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.FreezeAll;
+		Prawda1 = false;
+		czasStop = false;  //flaga do liczenia czasu odcinka
+ 		t = 0;
+	}
+
+
+
+	// metoda wywoływana po kliknieciu na play w menu głownym
+	public void startGry()
+	{
+		Debug.Log ("cos cos cos");
+
+		menuGl.SetActive(false);
+		gratulacje.SetActive(false);
+		gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.None;
+		Prawda1 = true;	// jezeli flaga ustawione jest na true to znczy ze menu jest wyłaczone
+		finisz = false;   // flaga do tapowania - ustawiamy na false zeby móc wchodzic w tapowanie
+		czasStop = false;  //flaga do liczenia czasu odcinka
+		t = 0;
+		
+	}
+
+	//metoda ktora przemieszcza kulke
+	public void ruchKulki()
+	{
+		Vector3 dir = Vector3.zero;
+
+		dir.y = -Input.acceleration.x;
+		dir.x = -Input.acceleration.y;
+
+		if (dir.sqrMagnitude > 1)
+			dir.Normalize ();
+		kulka.AddForce (dir * driveForce, ForceMode.VelocityChange);
+		Prawda1 = true;
+
+	}
+
+	void Tapnij ()
+	{
+		if (Input.touchCount > 0 && finisz == false) {
+			Touch myTouch = Input.touches [0];
+
+			if (myTouch.phase == TouchPhase.Began) {
+				gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.FreezeAll;
+				tapTap.SetActive(true);
+		
+
+
+
+			}
+
+		}
+
+
+
+	}
+
+
+	// funkcja odpowiada za dzwiek smiechu i przestawieniu kluki na poczatek lebiryntu po tym jak wpadnie z zła dziure, 
+	void OnTriggerEnter (Collider other)
+	{
+		if (other.gameObject.tag == "tablica") {
+
+			sound.PlayOneShot (smiech, 1f);
+			gameObject.GetComponent<Renderer> ().enabled = false;
+			gameObject.transform.position = poczatek;
+			gameObject.GetComponent<Renderer> ().enabled = true;
+			zamrozić = true;
+
+		}
+
+		if (other.gameObject.tag == "Finish")  // jezeli kluka doleci do finalnej dziury odtwrzane sa brava, kluka wraca na poczatek, frizujemy kluke i właczamy Grulacje
+		{	
+
+			sound.PlayOneShot (brava, 1f);
+			gameObject.GetComponent<Renderer> ().enabled = false;
+			gameObject.transform.position = poczatek;
+			gameObject.GetComponent<Renderer> ().enabled = true;
+			gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.FreezeAll;
+			gratulacje.SetActive(true);
+			finisz = true;   // flaga do tapowania - ustawiamy na true zeby nie wchodzic w tapowanie
+			gameObject.SendMessage("Finisz"); //to bedzie potrzbne do zliczania czasu
+			Prawda1 = true;  // flaga pz
+		}
+
+
+	}
+
+	public void Finisz()
+	{
+		czasStop = true;
+		czasomierz.color = Color.yellow;  
+	}
+
+
+	//dzwiek dbijania kulek od r=drewnianych scianek
+	void OnCollisionEnter(Collision col)
+	{
+
+		sound.PlayOneShot (pykpyk, 1f);
+
+	}
+
+
+	//funkcja zamraza kulke do czasu 0.5f i zmienia jej kolor
+	public void Respown ()
+	{
+
+
+		if (czas > 0.5f) {
+			gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.None;
+			Color color = new Color (1, 1, 1, 1);
+			gameObject.GetComponent<Renderer> ().material.color = color;
+			czas = 0;
+			r = 0;
+			g = 0;
+			b = 0;
+			a = 0;
+			zamrozić = false;
+
+		}
+
+
+		if (zamrozić == true) {
+
+			if (r > 1)
+				r = 0;
+			else
+				r += Time.deltaTime;
+
+			if (g > 1)
+				g = 0;
+			else
+				g += Time.deltaTime;
+
+			if (b > 1)
+				b = 0;
+			else
+				b += Time.deltaTime;
+
+			if (a > 1)
+				a = 0;
+			else
+				a += Time.deltaTime;
+
+			gameObject.GetComponent<Rigidbody> ().constraints = RigidbodyConstraints.FreezeAll;
+			Color color = new Color (r, g, b, a);
+			Debug.Log (color);
+			gameObject.GetComponent<Renderer> ().material.color = color;
+			czas += Time.deltaTime;
+			zamrozić = true;
+		}
+
+
+	}
+
+
+}
+
